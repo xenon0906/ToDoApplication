@@ -11,7 +11,7 @@ const renderTodos = () => {
     li.innerHTML = `
       <div class="top">
         <span class="${todo.completed ? 'completed' : ''}" onclick="toggleComplete(${index})">
-          ${todo.text} (${todo.priority})
+          ${todo.text}
         </span>
         <div class="actions">
           <button onclick="editTodo(${index})">✏️</button>
@@ -23,6 +23,17 @@ const renderTodos = () => {
         <div class="timer" id="timer-${index}">${getCountdownText(diff, todo)}</div>
       </div>
     `;
+    li.setAttribute('draggable', 'true');
+    li.addEventListener('dragstart', (e) => e.dataTransfer.setData('index', index));
+    li.addEventListener('dragover', (e) => e.preventDefault());
+    li.addEventListener('drop', (e) => {
+      const draggedIndex = e.dataTransfer.getData('index');
+      const droppedIndex = index;
+      const temp = todos[draggedIndex];
+      todos.splice(draggedIndex, 1);
+      todos.splice(droppedIndex, 0, temp);
+      renderTodos();
+    });
     list.appendChild(li);
   });
 
@@ -34,7 +45,6 @@ const addTodo = () => {
   const time = document.getElementById('todo-time').value;
   const duration = parseInt(document.getElementById('task-duration').value);
   const priority = document.getElementById('todo-priority').value;
-
   if (text && time && duration > 0) {
     todos.push({ text, time, duration, priority, completed: false });
     document.getElementById('todo-input').value = '';
@@ -100,46 +110,70 @@ const updateTimers = () => {
   });
 };
 
-// 🔊 MIC INPUT VISUALIZER
-let micButton = document.getElementById("mic-button");
-let audioContext, analyser, microphone, dataArray, canvasCtx;
+document.getElementById('priority-filter').addEventListener('change', function () {
+  const value = this.value;
+  if (value === 'all') {
+    renderTodos();
+  } else {
+    const filtered = todos.filter(todo => todo.priority === value);
+    const list = document.getElementById('todo-list');
+    list.innerHTML = '';
+    filtered.forEach((todo, index) => {
+      const li = document.createElement('li');
+      const diff = getTimeDiff(todo.time);
+      const status = getStatus(diff, todo);
+      li.innerHTML = `
+        <div class="top">
+          <span class="${todo.completed ? 'completed' : ''}" onclick="toggleComplete(${index})">
+            ${todo.text}
+          </span>
+          <div class="actions">
+            <button onclick="editTodo(${index})">✏️</button>
+            <button onclick="deleteTodo(${index})">🗑️</button>
+          </div>
+        </div>
+        <div class="meta">
+          <div class="status">${status}</div>
+          <div class="timer" id="timer-${index}">${getCountdownText(diff, todo)}</div>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+});
 
-function initMicVisualizer() {
-  const canvas = document.getElementById("mic-visualizer");
-  canvasCtx = canvas.getContext("2d");
+renderTodos();
+setInterval(updateTimers, 1000);
 
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioContext.createAnalyser();
-    microphone = audioContext.createMediaStreamSource(stream);
-    microphone.connect(analyser);
-    analyser.fftSize = 256;
-    const bufferLength = analyser.frequencyBinCount;
-    dataArray = new Uint8Array(bufferLength);
+const micButton = document.getElementById('mic-btn');
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let analyser, microphone, dataArray;
 
-    drawVisualizer();
-  }).catch(err => {
-    console.error("Mic access denied:", err);
-  });
-}
+navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+  microphone = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  const bufferLength = analyser.frequencyBinCount;
+  dataArray = new Uint8Array(bufferLength);
+  microphone.connect(analyser);
+  draw();
+});
 
-function drawVisualizer() {
-  requestAnimationFrame(drawVisualizer);
+const canvas = document.getElementById('mic-visualizer');
+const canvasCtx = canvas.getContext('2d');
+
+function draw() {
+  requestAnimationFrame(draw);
   analyser.getByteFrequencyData(dataArray);
-  canvasCtx.fillStyle = "#fff";
-  canvasCtx.fillRect(0, 0, 300, 60);
-  const barWidth = 3;
+  canvasCtx.fillStyle = '#fff';
+  canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+  const barWidth = (canvas.width / dataArray.length) * 1.5;
+  let barHeight;
   let x = 0;
   for (let i = 0; i < dataArray.length; i++) {
-    const barHeight = dataArray[i] / 2;
-    canvasCtx.fillStyle = "coral";
-    canvasCtx.fillRect(x, 60 - barHeight, barWidth, barHeight);
+    barHeight = dataArray[i] / 2;
+    canvasCtx.fillStyle = `rgb(102, 126, 234)`;
+    canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
     x += barWidth + 1;
   }
 }
-
-micButton.addEventListener("click", initMicVisualizer);
-
-// Init
-renderTodos();
-setInterval(updateTimers, 1000);
