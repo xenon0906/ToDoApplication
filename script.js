@@ -1,179 +1,109 @@
 let todos = JSON.parse(localStorage.getItem('todos')) || [];
+const root = document.documentElement;
+const themeBtn = document.getElementById('theme-btn');
 
-const renderTodos = () => {
+themeBtn.onclick = () => {
+  const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  themeBtn.textContent = next === 'dark' ? '🌙' : '☀️';
+};
+
+function render() {
+  const filter = document.getElementById('priority-filter').value;
   const list = document.getElementById('todo-list');
   list.innerHTML = '';
+  todos.forEach((t, i) => {
+    if (filter !== 'all' && t.priority !== filter) return;
+    const [h, m] = t.time.split(':');
+    const sched = new Date();
+    sched.setHours(+h, +m, 0, 0);
+    const diff = sched - new Date();
+    const elapsed = -diff / 60000;
 
-  todos.forEach((todo, index) => {
+    const status = diff>0 ? 'Upcoming' : elapsed > t.duration ? 'Finished' : 'In Progress';
+    const countdown = diff>0 ? `Starts in ${Math.ceil(diff/60000)}m`
+                         : elapsed>t.duration ? 'Ended' : `Ongoing ${Math.floor(elapsed)}m`;
+
     const li = document.createElement('li');
-    const diff = getTimeDiff(todo.time);
-    const status = getStatus(diff, todo);
+    if (t.completed) li.classList.add('completed');
     li.innerHTML = `
-      <div class="top">
-        <span class="${todo.completed ? 'completed' : ''}" onclick="toggleComplete(${index})">
-          ${todo.text}
-        </span>
-        <div class="actions">
-          <button onclick="editTodo(${index})">✏️</button>
-          <button onclick="deleteTodo(${index})">🗑️</button>
-        </div>
+      <div class="task-info">
+        <strong>${t.text}</strong>
+        <div class="meta">${countdown}<span class="badge">${status}</span></div>
       </div>
-      <div class="meta">
-        <div class="status">${status}</div>
-        <div class="timer" id="timer-${index}">${getCountdownText(diff, todo)}</div>
-      </div>
-    `;
-    li.setAttribute('draggable', 'true');
-    li.addEventListener('dragstart', (e) => e.dataTransfer.setData('index', index));
-    li.addEventListener('dragover', (e) => e.preventDefault());
-    li.addEventListener('drop', (e) => {
-      const draggedIndex = e.dataTransfer.getData('index');
-      const droppedIndex = index;
-      const temp = todos[draggedIndex];
-      todos.splice(draggedIndex, 1);
-      todos.splice(droppedIndex, 0, temp);
-      renderTodos();
-    });
+      <div>
+        <button class="button" onclick="toggle(${i})">✔️</button>
+        <button class="button" onclick="remove(${i})">🗑️</button>
+      </div>`;
     list.appendChild(li);
+    if (diff>0) scheduleNotify(t.text, diff);
   });
-
   localStorage.setItem('todos', JSON.stringify(todos));
-};
+}
 
-const addTodo = () => {
-  const text = document.getElementById('todo-input').value.trim();
-  const time = document.getElementById('todo-time').value;
-  const duration = parseInt(document.getElementById('task-duration').value);
-  const priority = document.getElementById('todo-priority').value;
-  if (text && time && duration > 0) {
-    todos.push({ text, time, duration, priority, completed: false });
-    document.getElementById('todo-input').value = '';
-    document.getElementById('todo-time').value = '';
-    document.getElementById('task-duration').value = '';
-    renderTodos();
+function addTodo() {
+  const t = document.getElementById('todo-input').value.trim();
+  const tm = document.getElementById('todo-time').value;
+  const dr = +document.getElementById('task-duration').value;
+  const pr = document.getElementById('todo-priority').value;
+  if (!t || !tm || !dr) return;
+  todos.unshift({ text: t, time: tm, duration: dr, priority: pr, completed: false });
+  ['todo-input','todo-time','task-duration'].forEach(id=>document.getElementById(id).value='');
+  render();
+}
+
+function toggle(i) {
+  todos[i].completed = !todos[i].completed; render();
+}
+function remove(i) {
+  if (confirm('Delete this task?')) { todos.splice(i,1); render(); }
+}
+function scheduleNotify(text, delay) {
+  if (Notification.permission === 'granted')
+    setTimeout(() => new Notification('🔔 FocusFlow Reminder', { body: text }), delay);
+}
+if (Notification.permission !== 'granted') Notification.requestPermission();
+
+setInterval(render, 60000);
+render();
+
+// Microphone Analyze Start/Stop
+const micStart = document.getElementById('mic-start');
+const micStop = document.getElementById('mic-stop');
+const meter = document.getElementById('mic-meter');
+let analysing = false, audioCtx, analyser, dataArr;
+
+micStart.onclick = async () => {
+  if (analysing) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    src.connect(analyser);
+    dataArr = new Uint8Array(analyser.frequencyBinCount);
+    analysing = true;
+    micStart.disabled = true;
+    micStop.disabled = false;
+    drawMeter();
+  } catch {
+    alert('Microphone access denied');
   }
 };
 
-const deleteTodo = index => {
-  todos.splice(index, 1);
-  renderTodos();
+micStop.onclick = () => {
+  analysing = false;
+  micStart.disabled = false;
+  micStop.disabled = true;
+  if (audioCtx) audioCtx.close();
+  meter.style.width = '0%';
 };
 
-const toggleComplete = index => {
-  todos[index].completed = !todos[index].completed;
-  renderTodos();
-};
-
-const editTodo = index => {
-  const newText = prompt('Edit your task:', todos[index].text);
-  if (newText && newText.trim() !== '') {
-    todos[index].text = newText.trim();
-    renderTodos();
-  }
-};
-
-const getTimeDiff = (targetTime) => {
-  const now = new Date();
-  const [hours, minutes] = targetTime.split(':').map(Number);
-  const target = new Date();
-  target.setHours(hours, minutes, 0, 0);
-  return target.getTime() - now.getTime();
-};
-
-const getStatus = (diff, todo) => {
-  if (diff > 0) return 'Upcoming';
-  const elapsed = -diff / 60000;
-  if (elapsed > todo.duration) return 'Finished';
-  return 'In Progress';
-};
-
-const getCountdownText = (diff, todo) => {
-  const mins = Math.floor(Math.abs(diff) / 60000);
-  const secs = Math.floor((Math.abs(diff) % 60000) / 1000);
-  const elapsed = -diff / 60000;
-  if (diff > 0) return `Starts in: ${mins}m ${secs}s`;
-  if (elapsed > todo.duration) return `Ended`;
-  return `Ongoing: ${Math.floor(elapsed)}m ${Math.floor((elapsed % 1) * 60)}s`;
-};
-
-const updateTimers = () => {
-  todos.forEach((todo, index) => {
-    const diff = getTimeDiff(todo.time);
-    const status = getStatus(diff, todo);
-    const timerText = getCountdownText(diff, todo);
-    const timerEl = document.getElementById(`timer-${index}`);
-    const statusEl = timerEl?.parentElement?.querySelector('.status');
-    if (timerEl && statusEl) {
-      timerEl.innerText = timerText;
-      statusEl.innerText = status;
-    }
-  });
-};
-
-document.getElementById('priority-filter').addEventListener('change', function () {
-  const value = this.value;
-  if (value === 'all') {
-    renderTodos();
-  } else {
-    const filtered = todos.filter(todo => todo.priority === value);
-    const list = document.getElementById('todo-list');
-    list.innerHTML = '';
-    filtered.forEach((todo, index) => {
-      const li = document.createElement('li');
-      const diff = getTimeDiff(todo.time);
-      const status = getStatus(diff, todo);
-      li.innerHTML = `
-        <div class="top">
-          <span class="${todo.completed ? 'completed' : ''}" onclick="toggleComplete(${index})">
-            ${todo.text}
-          </span>
-          <div class="actions">
-            <button onclick="editTodo(${index})">✏️</button>
-            <button onclick="deleteTodo(${index})">🗑️</button>
-          </div>
-        </div>
-        <div class="meta">
-          <div class="status">${status}</div>
-          <div class="timer" id="timer-${index}">${getCountdownText(diff, todo)}</div>
-        </div>
-      `;
-      list.appendChild(li);
-    });
-  }
-});
-
-renderTodos();
-setInterval(updateTimers, 1000);
-
-const micButton = document.getElementById('mic-btn');
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let analyser, microphone, dataArray;
-
-navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-  microphone = audioCtx.createMediaStreamSource(stream);
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 256;
-  const bufferLength = analyser.frequencyBinCount;
-  dataArray = new Uint8Array(bufferLength);
-  microphone.connect(analyser);
-  draw();
-});
-
-const canvas = document.getElementById('mic-visualizer');
-const canvasCtx = canvas.getContext('2d');
-
-function draw() {
-  requestAnimationFrame(draw);
-  analyser.getByteFrequencyData(dataArray);
-  canvasCtx.fillStyle = '#fff';
-  canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-  const barWidth = (canvas.width / dataArray.length) * 1.5;
-  let barHeight;
-  let x = 0;
-  for (let i = 0; i < dataArray.length; i++) {
-    barHeight = dataArray[i] / 2;
-    canvasCtx.fillStyle = `rgb(102, 126, 234)`;
-    canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-    x += barWidth + 1;
-  }
+function drawMeter() {
+  if (!analysing) return;
+  analyser.getByteFrequencyData(dataArr);
+  const peak = Math.max(...dataArr);
+  meter.style.width = Math.min(100, peak / 255 * 100) + '%';
+  requestAnimationFrame(drawMeter);
 }
