@@ -1,42 +1,16 @@
-# 🎯 FocusFlow – Smart Voice-Enhanced Task Scheduler
+# 🎯 FocusFlow – Voice-Assisted Smart To-Do App
 
-**FocusFlow** is a minimalist, smart task scheduler that lets you add, manage, and track your tasks visually – with both text input and **voice interaction**. Designed for productivity, it combines clean UI, drag-and-drop sorting, voice visualization, countdown timers, and priority filtering.
-
----
-
-### 🚀 Features
-
-- ✅ Add tasks with time, duration, and priority
-- 🧠 Intelligent categorization: Upcoming / In Progress / Finished
-- 🎤 Live **voice activity visualizer** under the mic button
-- 🧱 Drag-and-drop task reordering
-- 🎯 Real-time progress countdowns for each task
-- 🔍 Filter tasks by priority (Low / Medium / High)
-- 💡 Visual timer and status updates every second
-- 🧼 Simple, clean UI with responsive design
-- 💾 LocalStorage support for persistent tasks
+**FocusFlow** is a modern, visually sleek productivity app that helps you plan, speak, and stay focused. With real-time microphone input visualization, priority-based reminders, and a clean UI, it makes managing your day a delightful and addictive experience.
 
 ---
 
-### 📸 Preview
+## 🚀 Features
 
-> *(Add screenshots or a short GIF here)*  
-> You can use tools like Screenity, Licecap, or Loom to record a GIF demo.
-
----
-
-### 🛠️ Tech Stack
-
-- HTML5, CSS3
-- JavaScript (Vanilla)
-- Web Audio API (Voice visualizer)
-- LocalStorage
-- Chart.js (Optional for future tracking)
-
----
-
-### 🎙️ Voice Input Format (Future Extension)
-
-> _This is under progress if using voice recognition (add with Web Speech API)_
-
-
+- 🎙️ **Voice Input Meter** – Real-time microphone frequency visualizer
+- 🔔 **Smart Notifications** – Browser alerts to remind you of tasks
+- ⏳ **Time & Duration Tracking** – Auto-detects task progress and shows live status
+- 🎨 **Beautiful UI** – Modern glassmorphism design with sleek vertical & horizontal alignment
+- 📅 **Priority Filter** – Filter tasks by urgency (High / Medium / Low)
+- ✅ **Task Completion Tracking** – Mark tasks as complete or remove them
+- 💾 **Persistent Storage** – Saves tasks locally using `localStorage`
+- ⛔ **Start / Stop Listening** – Fully controllable mic listener
